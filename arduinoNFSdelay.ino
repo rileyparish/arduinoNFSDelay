@@ -1,3 +1,11 @@
+/*
+Hey there! This code was originally written for our YouTube channel, https://www.youtube.com/RKadeGaming
+We're glad that you've taken an interest in our project, and we hope that you have a good time building it!
+We've made this code public, and you're free to use it however you like. If you end up sharing the project with others though, 
+we'd appreciate some attribution so that people know where to find more stuff like this.
+Thanks, and have fun! :)
+*/
+
 #include "Wire.h"
 #include <Keyboard.h>
 #include "ListLib.h"
@@ -9,14 +17,13 @@ float roll, pitch, curRoll, curPitch = 0;        // variables for the processed 
 
 // the number of keys that I'll code the accelerometer to output. In this instance, map accelerometer values to steer left/right
 const int numKeys = 2;
-const char keyCodes[numKeys] = {KEY_LEFT_ARROW, KEY_RIGHT_ARROW};
+const int keyCodes[numKeys] = {KEY_LEFT_ARROW, KEY_RIGHT_ARROW};
 // this is an array of AccelInput structs called "Inputs" that contains numKeys items in it (left/right)
-// TODO: verify these values
-const float pitchThresholds[numKeys] =  {-70, 70};
+const float rollThresholds[numKeys] =  {40, -40};
 
 struct AccelInput {
-    char keycode;
-    float pitch;
+    int keycode;
+    float roll;
     boolean wasActive = false;
 };
 
@@ -30,7 +37,7 @@ void setup(){
     Serial.begin(115200);
     initAccelerometer();        // initiate communication with the accelerometer
     initAccelInputs();      // initialize the accelerometer inputs (the left/right keys)
-
+    
 }
 
 void loop(){
@@ -41,7 +48,7 @@ void loop(){
     for(int i = 0; i < numKeys; i++){
         shouldActivateAccel = Inputs[i].wasActive;       // assume that the state will not change
         // determine whether the key is within the range to register a press
-        if(isWithinRange(curPitch, Inputs[i].pitch, Inputs[i].keycode)){
+        if(isWithinRange(curRoll, Inputs[i].roll, Inputs[i].keycode)){
             // if the values are within range, the current key should be pressed
             shouldActivateAccel = true;
         }else{
@@ -58,17 +65,14 @@ void loop(){
             Inputs[i].wasActive = shouldActivateAccel;
         }
     }
-
-
 }
 
-// is the current pitch measurement within range to press the associated key?
-bool isWithinRange(float curPitch, float targetPitch, char keycode){
+// is the current roll measurement within range to press the associated key?
+bool isWithinRange(float curRoll, float targetRoll, int keycode){
     // check if the accelerometer reading is within range to press the left or right arrow keys repsectively
-    // todo: the signs of these might be flipped; need to test the actual accelerometer
-    if(keycode == KEY_LEFT_ARROW && curPitch < targetPitch){
+    if(keycode == KEY_LEFT_ARROW && curRoll > targetRoll){
         return true;
-    }else if(keycode == KEY_RIGHT_ARROW && curPitch > targetPitch){
+    }else if(keycode == KEY_RIGHT_ARROW && curRoll < targetRoll){
         return true;
     }
     return false;
@@ -85,7 +89,7 @@ void getRollPitch(){
     // "Wire.read()<<8 | Wire.read();" means two registers are read and stored in the same variable
     curX = Wire.read()<<8 | Wire.read(); // reading registers: 0x3B (ACCEL_XOUT_H) and 0x3C (ACCEL_XOUT_L)
     curY = Wire.read()<<8 | Wire.read(); // reading registers: 0x3D (ACCEL_YOUT_H) and 0x3E (ACCEL_YOUT_L)
-    curZ = Wire.read()<<8 | Wire.read(); // reading registers: 0x3F (ACCEL_ZOUT_H) and 0x40 (ACCEL_ZOUT_L)
+    curZ = Wire.read()<<8 | Wire.read(); // reading registers: 0x3F (ACCEL_ZOUT_H) and 0x40  (ACCEL_ZOUT_L)
     curX = curX / 256;
     curY = curY / 256;
     curZ = curZ / 256;
@@ -96,9 +100,8 @@ void getRollPitch(){
     pitch = atan(-1 * curX / sqrt(pow(curY, 2) + pow(curZ, 2))) * 180 / PI;
   
     // Low-pass filter (to reduce noise). This is really important because the sensors are pretty noisy
-    // .94 and .06 were the initial values. I adjusted the values to reduce multiple keypresses when moving to a new tilt
-    curRoll = 0.98 * curRoll + 0.02 * roll;
-    curPitch = 0.98 * curPitch + 0.02 * pitch;
+    curRoll = 0.94 * curRoll + 0.06 * roll;
+    curPitch = 0.94 * curPitch + 0.06 * pitch;
 }
 
 
@@ -114,7 +117,7 @@ void initAccelerometer(){
 void initAccelInputs(){
     for(int i = 0; i < numKeys; i++){
         Inputs[i].keycode = keyCodes[i];
-        Inputs[i].pitch = pitchThresholds[i];
+        Inputs[i].roll = rollThresholds[i];
     }
 }
 
