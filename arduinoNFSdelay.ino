@@ -6,6 +6,8 @@ we'd appreciate some attribution so that people know where to find more stuff li
 Thanks, and have fun! :)
 */
 
+// this file got way more convoluted than I like. Someday I'll write a really nice C++ class for this stuff...
+
 #include "Wire.h"
 #include <Keyboard.h>
 #include "ListLib.h"
@@ -18,7 +20,7 @@ float roll, pitch, curRoll, curPitch = 0;        // variables for the processed 
 // the number of keys that I'll code the accelerometer to output. In this instance, map accelerometer values to steer left/right
 const int numKeys = 2;
 const int keyCodes[numKeys] = {KEY_LEFT_ARROW, KEY_RIGHT_ARROW};
-// this is an array of AccelInput structs called "Inputs" that contains numKeys items in it (left/right)
+
 const float rollThresholds[numKeys] =  {40, -40};
 
 struct AccelInput {
@@ -29,8 +31,8 @@ struct AccelInput {
 
 boolean shouldActivateAccel = false;     // this keeps track of whether a given key should be pressed or not given the current accelerometer readings
 
-// this is an array of AccelInput structs called "Inputs" that contains numKeys items in it (wasd)
-AccelInput Inputs[numKeys];
+// this is an array of AccelInput structs called "Inputs" that contains numKeys items in it (left/right)
+AccelInput AccelInputs[numKeys];
 
 
 void setup(){
@@ -46,9 +48,9 @@ void loop(){
 
     // now determine if the arrow keys to be pressed or released
     for(int i = 0; i < numKeys; i++){
-        shouldActivateAccel = Inputs[i].wasActive;       // assume that the state will not change
+        shouldActivateAccel = AccelInputs[i].wasActive;       // assume that the state will not change
         // determine whether the key is within the range to register a press
-        if(isWithinRange(curRoll, Inputs[i].roll, Inputs[i].keycode)){
+        if(isWithinRange(curRoll, AccelInputs[i].roll, AccelInputs[i].keycode)){
             // if the values are within range, the current key should be pressed
             shouldActivateAccel = true;
         }else{
@@ -56,7 +58,7 @@ void loop(){
         }
         
         // if the activity state on this iteration is different from the previous iteration, press or release the key
-        if(shouldActivateAccel != Inputs[i].wasActive){
+        if(shouldActivateAccel != AccelInputs[i].wasActive){
             if(shouldActivateAccel){
                 Keyboard.press(Inputs[i].keycode);
             }else{
@@ -116,8 +118,8 @@ void initAccelerometer(){
 
 void initAccelInputs(){
     for(int i = 0; i < numKeys; i++){
-        Inputs[i].keycode = keyCodes[i];
-        Inputs[i].roll = rollThresholds[i];
+        AccelInputs[i].keycode = keyCodes[i];
+        AccelInputs[i].roll = rollThresholds[i];
     }
 }
 
