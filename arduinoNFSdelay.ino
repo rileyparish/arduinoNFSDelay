@@ -32,40 +32,127 @@ struct AccelInput {
 boolean shouldActivateAccel = false;     // this keeps track of whether a given key should be pressed or not given the current accelerometer readings
 
 // this is an array of AccelInput structs called "Inputs" that contains numKeys items in it (left/right)
-AccelInput AccelInputs[numKeys];
+AccelInput accelInputs[numKeys];
+
+const int PressedMaxThreshold = 200; // this is the maximum reading when the button is pressed. Anything underneath this value will register as a touch (a higher number will allow inputs with a higher natural resistance at the risk of false positives)
+const int ReleasedMinThreshold = 300; // this is the minimum reading when there is no connection. Any reading higher than this will register as no longer touching
+const int numTouchKeys = 3;
+const int analogPins[numTouchKeys] = {A0, A1, A3};
+const int touchKeyCodes[numTouchKeys] = {'-', ' ', KEY_LEFT_SHIFT};
+const char forwardKey = 'w';
+const char backwardKey = 's';
+// the analog inputs (touch inputs) are for gas, brake, nitros
+struct AnalogInput {
+    byte analogPin;
+    char keycode;
+    boolean wasActive = false;
+};
+
+boolean shouldActivateTouch = false;
+AnalogInput analogInputs[numTouchKeys];
+
+// the status of this pin determines whether the car should be going forward or backward
+const int directionPin = 7;
 
 
 void setup(){
     Serial.begin(115200);
     initAccelerometer();        // initiate communication with the accelerometer
     initAccelInputs();      // initialize the accelerometer inputs (the left/right keys)
-    
+    initAnalogInputs();
+
+    pinMode(directionPin, INPUT_PULLUP);    
 }
 
 void loop(){
-    // this function reads from the accelerometer and calculates the roll and pitch, which are stored in curRoll and curPitch
+    // this function reads from the accelerometer and calculates the roll and pitch, which are stored in curRoll and curPitch (though pitch doesn't matter for this setup)
     getRollPitch();
+    // Serial.println("?");
+    // delay(500);
 
     // now determine if the arrow keys to be pressed or released
     for(int i = 0; i < numKeys; i++){
-        shouldActivateAccel = AccelInputs[i].wasActive;       // assume that the state will not change
+        shouldActivateAccel = accelInputs[i].wasActive;       // assume that the state will not change
         // determine whether the key is within the range to register a press
-        if(isWithinRange(curRoll, AccelInputs[i].roll, AccelInputs[i].keycode)){
+        if(isWithinRange(curRoll, accelInputs[i].roll, accelInputs[i].keycode)){
             // if the values are within range, the current key should be pressed
             shouldActivateAccel = true;
         }else{
             shouldActivateAccel = false;
         }
-        
+
         // if the activity state on this iteration is different from the previous iteration, press or release the key
-        if(shouldActivateAccel != AccelInputs[i].wasActive){
+        if(shouldActivateAccel != accelInputs[i].wasActive){
             if(shouldActivateAccel){
-                Keyboard.press(Inputs[i].keycode);
+                Serial.print("Pressing key: ");
+                Serial.println(accelInputs[i].keycode);
+                Keyboard.press(accelInputs[i].keycode);
             }else{
-                Keyboard.release(Inputs[i].keycode);
+                Serial.print("Releasing key: ");
+                Serial.println(accelInputs[i].keycode);
+                Keyboard.release(accelInputs[i].keycode);
             }
-            Inputs[i].wasActive = shouldActivateAccel;
+            accelInputs[i].wasActive = shouldActivateAccel;
         }
+    }
+
+    // now loop through the touch inputs and determine if they should be pressed or released
+    for(int i = 0; i < numTouchKeys; i++){
+        shouldActivateTouch = analogInputs[i].wasActive;
+        // todo: this might require smoothing, idk
+        float pinStatus = analogRead(analogInputs[i].analogPin);
+        boolean previousState = analogInputs[i].wasActive;
+        boolean currentState = previousState;
+
+        if(pinStatus < PressedMaxThreshold){
+            currentState = true; // this means that the circuit has been completed, so the key should be pressed
+        }else if(pinStatus > ReleasedMinThreshold){
+            currentState = false; // the circuit has been broken, so the key should be released
+        }
+
+        // if the state of the pin has changed since the last iteration
+        if(currentState != previousState){
+            // then start or stop pressing the key (the opposite of what it was before)
+
+            if(i = 0){
+                // pin 0 is the gas, and the direction depends on the state of directionPin so we need extra logic here
+                if (currentState){
+                    if(digitalRead(directionPin) == LOW){
+                        // the limit switch is engaged, so go backwards
+                        Serial.print("Pressing key: ");
+                        Serial.println(backwardKey);
+                        Keyboard.press(backwardKey);
+                    }else{
+                        Serial.print("Pressing key: ");
+                        Serial.println(forwardKey);
+                        Keyboard.press(forwardKey);
+                    } 
+                }
+                else{
+                    if(digitalRead(directionPin) == LOW){
+                        Serial.print("Releasing key: ");
+                        Serial.println(backwardKey);
+                        Keyboard.release(backwardKey);
+                    }else{
+                        Serial.print("Releasing key: ");
+                        Serial.println(forwardKey);
+                        Keyboard.release(forwardKey);
+                    }
+                }
+            }else{
+                // proceed with the normal criteria
+                if(currentState){
+                    Serial.print("Pressing key: ");
+                    Serial.println(analogInputs[i].keycode);
+                    Keyboard.press(analogInputs[i].keycode);
+                }else{
+                    Serial.print("Releasing key: ");
+                    Serial.println(analogInputs[i].keycode);
+                    Keyboard.release(analogInputs[i].keycode);
+                }
+            }            
+        }
+        analogInputs[i].wasActive = currentState;
     }
 }
 
@@ -118,8 +205,15 @@ void initAccelerometer(){
 
 void initAccelInputs(){
     for(int i = 0; i < numKeys; i++){
-        AccelInputs[i].keycode = keyCodes[i];
-        AccelInputs[i].roll = rollThresholds[i];
+        accelInputs[i].keycode = keyCodes[i];
+        accelInputs[i].roll = rollThresholds[i];
+    }
+}
+
+void initAnalogInputs(){
+    for(int i = 0; i < numTouchKeys; i++){
+        analogInputs[i].keycode = touchKeyCodes[i];
+        analogInputs[i].analogPin = analogPins[i];
     }
 }
 
