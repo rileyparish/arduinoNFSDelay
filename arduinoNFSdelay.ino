@@ -38,10 +38,12 @@ const int PressedMaxThreshold = 200; // this is the maximum reading when the but
 const int ReleasedMinThreshold = 300; // this is the minimum reading when there is no connection. Any reading higher than this will register as no longer touching
 const int numTouchKeys = 3;
 const int analogPins[numTouchKeys] = {A0, A1, A3};
+// warning: the order of these inputs matters; it expects "gas" to be in the 0th position because it behaves differently than the other inputs
+// const int touchKeyCodes[numTouchKeys] = {'-', ' ', KEY_LEFT_SHIFT};
 const int touchKeyCodes[numTouchKeys] = {'-', ' ', KEY_LEFT_SHIFT};
 const char forwardKey = 'w';
 const char backwardKey = 's';
-// the analog inputs (touch inputs) are for gas, brake, nitros
+// the analog inputs (touch inputs) are for gas, brake, nitrous
 struct AnalogInput {
     byte analogPin;
     char keycode;
@@ -61,14 +63,13 @@ void setup(){
     initAccelInputs();      // initialize the accelerometer inputs (the left/right keys)
     initAnalogInputs();
 
-    pinMode(directionPin, INPUT_PULLUP);    
+    pinMode(directionPin, INPUT_PULLUP);
 }
 
 void loop(){
     // this function reads from the accelerometer and calculates the roll and pitch, which are stored in curRoll and curPitch (though pitch doesn't matter for this setup)
     getRollPitch();
-    // Serial.println("?");
-    // delay(500);
+    // Serial.println(curRoll);
 
     // now determine if the arrow keys to be pressed or released
     for(int i = 0; i < numKeys; i++){
@@ -96,14 +97,15 @@ void loop(){
         }
     }
 
-    // now loop through the touch inputs and determine if they should be pressed or released
+    // now loop through the touch inputs (gas, brake, nitrous) and determine if they should be pressed or released
     for(int i = 0; i < numTouchKeys; i++){
-        shouldActivateTouch = analogInputs[i].wasActive;
-        // todo: this might require smoothing, idk
+        // read the current state of the pin:
         float pinStatus = analogRead(analogInputs[i].analogPin);
+        // Serial.println(pinStatus);
         boolean previousState = analogInputs[i].wasActive;
-        boolean currentState = previousState;
+        boolean currentState = previousState;       // default if in the dead zone
 
+        // given the state of the pins, should the key be pressed right now or should it be released?
         if(pinStatus < PressedMaxThreshold){
             currentState = true; // this means that the circuit has been completed, so the key should be pressed
         }else if(pinStatus > ReleasedMinThreshold){
@@ -114,44 +116,30 @@ void loop(){
         if(currentState != previousState){
             // then start or stop pressing the key (the opposite of what it was before)
 
-            if(i = 0){
+            if(i == 0){
                 // pin 0 is the gas, and the direction depends on the state of directionPin so we need extra logic here
                 if (currentState){
                     if(digitalRead(directionPin) == LOW){
                         // the limit switch is engaged, so go backwards
-                        Serial.print("Pressing key: ");
-                        Serial.println(backwardKey);
                         Keyboard.press(backwardKey);
                     }else{
-                        Serial.print("Pressing key: ");
-                        Serial.println(forwardKey);
                         Keyboard.press(forwardKey);
                     } 
-                }
-                else{
-                    if(digitalRead(directionPin) == LOW){
-                        Serial.print("Releasing key: ");
-                        Serial.println(backwardKey);
-                        Keyboard.release(backwardKey);
-                    }else{
-                        Serial.print("Releasing key: ");
-                        Serial.println(forwardKey);
-                        Keyboard.release(forwardKey);
-                    }
+                } else{
+                    // just release both keys to remove the possibility of pressing one key but then releasing on a different key (if the state of the gearshift changed before the gas was released)
+                    Keyboard.release(backwardKey);
+                    Keyboard.release(forwardKey);
                 }
             }else{
                 // proceed with the normal criteria
                 if(currentState){
-                    Serial.print("Pressing key: ");
-                    Serial.println(analogInputs[i].keycode);
                     Keyboard.press(analogInputs[i].keycode);
                 }else{
-                    Serial.print("Releasing key: ");
-                    Serial.println(analogInputs[i].keycode);
                     Keyboard.release(analogInputs[i].keycode);
                 }
             }            
         }
+        // based on the readings this round, update the "active" state for the next round
         analogInputs[i].wasActive = currentState;
     }
 }
