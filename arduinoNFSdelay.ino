@@ -65,7 +65,7 @@ struct Event {
 };
 
 List<Event> eventList;
-unsigned long inputDelay = 500;         // the amount of time to delay before processing the event (ms)
+unsigned long inputDelay = 1000;         // the amount of time to delay before processing the event (ms)
 
 
 void setup(){
@@ -80,7 +80,6 @@ void setup(){
 void loop(){
     // this function reads from the accelerometer and calculates the roll and pitch, which are stored in curRoll and curPitch (though pitch doesn't matter for this setup)
     getRollPitch();
-    // Serial.println(curRoll);
 
     // now determine if the arrow keys to be pressed or released
     for(int i = 0; i < numKeys; i++){
@@ -124,27 +123,17 @@ void loop(){
                 if (currentState){
                     if(digitalRead(directionPin) == LOW){
                         // the limit switch is engaged, so go backwards
-                        // Keyboard.press(backwardKey);
                         addEvent(backwardKey, currentState);
                     }else{
-                        // Keyboard.press(forwardKey);
                         addEvent(forwardKey, currentState);
                     } 
                 } else{
                     // just release both keys to remove the possibility of pressing one key but then releasing on a different key (if the state of the gearshift changed before the gas was released)
                     addEvent(backwardKey, currentState);
                     addEvent(forwardKey, currentState);
-                    // Keyboard.release(backwardKey);
-                    // Keyboard.release(forwardKey);
                 }
             }else{
                 addEvent(analogInputs[i].keycode, currentState);
-                // proceed with the normal criteria
-                // if(currentState){
-                //     Keyboard.press(analogInputs[i].keycode);
-                // }else{
-                //     Keyboard.release(analogInputs[i].keycode);
-                // }
             }            
         }
         // based on the readings this round, update the "active" state for the next round
@@ -222,10 +211,10 @@ void processEventQueue(){
                 // the event has been processed, remove it from the list
                 eventList.Remove(i);
             }
-            // else{
-            //     // the events will all be in order from soonest to latest, so if it's not time to process the current element, none of the subsequent elements will be ready yet either
-            //     break;
-            // }
+            else{
+                // the events will all be in order from soonest to latest, so if it's not time to process the current element, none of the subsequent elements will be ready yet either
+                break;
+            }
         }
     }
 }
