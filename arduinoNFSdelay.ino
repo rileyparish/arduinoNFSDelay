@@ -59,13 +59,13 @@ const int directionPin = 7;
 // now initialize the logic to delay key presses:
 // so instead of pressing keys when I detect them, I should add them to a queue of events which I process after a delay
 struct Event {
-    char keycode;   // what letter to press. Not sure how to do this with joystick input...
+    int keycode;   // what letter to press.
     bool pressButton;     // whether to press or release the key
     unsigned long timeToExecute;    // the time the action should be executed
 };
 
 List<Event> eventList;
-unsigned long inputDelay = 1000;         // the amount of time to delay before processing the event (ms)
+unsigned long inputDelay = 500;         // the amount of time to delay before processing the event (ms)
 
 
 void setup(){
@@ -95,15 +95,7 @@ void loop(){
 
         // if the activity state on this iteration is different from the previous iteration, press or release the key
         if(shouldActivateAccel != accelInputs[i].wasActive){
-            if(shouldActivateAccel){
-                Serial.print("Pressing key: ");
-                Serial.println(accelInputs[i].keycode);
-                Keyboard.press(accelInputs[i].keycode);
-            }else{
-                Serial.print("Releasing key: ");
-                Serial.println(accelInputs[i].keycode);
-                Keyboard.release(accelInputs[i].keycode);
-            }
+            addEvent(accelInputs[i].keycode, shouldActivateAccel);
             accelInputs[i].wasActive = shouldActivateAccel;
         }
     }
@@ -132,22 +124,27 @@ void loop(){
                 if (currentState){
                     if(digitalRead(directionPin) == LOW){
                         // the limit switch is engaged, so go backwards
-                        Keyboard.press(backwardKey);
+                        // Keyboard.press(backwardKey);
+                        addEvent(backwardKey, currentState);
                     }else{
-                        Keyboard.press(forwardKey);
+                        // Keyboard.press(forwardKey);
+                        addEvent(forwardKey, currentState);
                     } 
                 } else{
                     // just release both keys to remove the possibility of pressing one key but then releasing on a different key (if the state of the gearshift changed before the gas was released)
-                    Keyboard.release(backwardKey);
-                    Keyboard.release(forwardKey);
+                    addEvent(backwardKey, currentState);
+                    addEvent(forwardKey, currentState);
+                    // Keyboard.release(backwardKey);
+                    // Keyboard.release(forwardKey);
                 }
             }else{
+                addEvent(analogInputs[i].keycode, currentState);
                 // proceed with the normal criteria
-                if(currentState){
-                    Keyboard.press(analogInputs[i].keycode);
-                }else{
-                    Keyboard.release(analogInputs[i].keycode);
-                }
+                // if(currentState){
+                //     Keyboard.press(analogInputs[i].keycode);
+                // }else{
+                //     Keyboard.release(analogInputs[i].keycode);
+                // }
             }            
         }
         // based on the readings this round, update the "active" state for the next round
@@ -193,6 +190,16 @@ void getRollPitch(){
     // Low-pass filter (to reduce noise). This is really important because the sensors are pretty noisy
     curRoll = 0.94 * curRoll + 0.06 * roll;
     curPitch = 0.94 * curPitch + 0.06 * pitch;
+}
+
+void addEvent(int keycode, bool keyIsActive){
+    // create a new event to process after the delay has passed
+    Event newEvent = {
+        keycode,
+        keyIsActive,
+        millis() + inputDelay
+    };
+    eventList.Add(newEvent);
 }
 
 void processEventQueue(){
