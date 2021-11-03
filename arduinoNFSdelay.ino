@@ -56,6 +56,17 @@ AnalogInput analogInputs[numTouchKeys];
 // the status of this pin determines whether the car should be going forward or backward
 const int directionPin = 7;
 
+// now initialize the logic to delay key presses:
+// so instead of pressing keys when I detect them, I should add them to a queue of events which I process after a delay
+struct Event {
+    char keycode;   // what letter to press. Not sure how to do this with joystick input...
+    bool pressButton;     // whether to press or release the key
+    unsigned long timeToExecute;    // the time the action should be executed
+};
+
+List<Event> eventList;
+unsigned long inputDelay = 1000;         // the amount of time to delay before processing the event (ms)
+
 
 void setup(){
     Serial.begin(115200);
@@ -142,6 +153,9 @@ void loop(){
         // based on the readings this round, update the "active" state for the next round
         analogInputs[i].wasActive = currentState;
     }
+
+    // the current state of all of the pins has been updated correctly, now process all the key presses on the queue
+    processEventQueue();
 }
 
 // is the current roll measurement within range to press the associated key?
@@ -181,6 +195,33 @@ void getRollPitch(){
     curPitch = 0.94 * curPitch + 0.06 * pitch;
 }
 
+void processEventQueue(){
+    // process events in the event list
+    if(!eventList.IsEmpty()){
+        // cycle through all the events in the list and process them
+        for(int i = 0; i < eventList.Count(); i++){
+
+            // if it's time to process the event
+            if(eventList[i].timeToExecute <= millis()){
+                // if the action associated with this event is a press, press the key
+                if(eventList[i].pressButton){
+                    Serial.println("Time has elapsed, pressing " + String(eventList[i].keycode));
+                    Keyboard.press(eventList[i].keycode);
+                }else{
+                    // otherwise, release the key
+                    Serial.println("Time has elapsed, releasing " + String(eventList[i].keycode));
+                    Keyboard.release(eventList[i].keycode);
+                }
+                // the event has been processed, remove it from the list
+                eventList.Remove(i);
+            }
+            // else{
+            //     // the events will all be in order from soonest to latest, so if it's not time to process the current element, none of the subsequent elements will be ready yet either
+            //     break;
+            // }
+        }
+    }
+}
 
 void initAccelerometer(){
     // set up the accelerometer
